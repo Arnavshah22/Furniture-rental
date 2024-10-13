@@ -48,6 +48,43 @@ const registerUser=asyncHandler(async(req,res)=>{
 
 })
 
+const LoginUser = asyncHandler(async (req, res) => {
+    const { email, password } = req.body;
 
-export  {registerUser}
+    if (!email) {
+        throw new apiError(400, "Email is required");
+    }
+
+    if (!password) {
+        throw new apiError(400, "Password is required");
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+        throw new apiError(404, "User does not exist");
+    }
+
+    const isPasswordValid = await user.isPasswordCorrect(password);
+
+    if (!isPasswordValid) {
+        throw new apiError(401, "Invalid credentials");
+    }
+
+    const loggedInUser = await User.findById(user._id).select("-password");
+
+    const options = {
+        httpOnly: true,
+        secure: true
+    };
+
+    return res
+        .status(200)
+        .cookie("token", loggedInUser.generateAuthToken(), options)
+        .json(new apiResponse(200, { user: loggedInUser }, "User logged in successfully"));
+});
+
+
+
+export  {registerUser,LoginUser}
 
