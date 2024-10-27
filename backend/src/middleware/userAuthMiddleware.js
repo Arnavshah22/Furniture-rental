@@ -1,21 +1,49 @@
 import dotenv from "dotenv";
 dotenv.config();
 import jwt from "jsonwebtoken";
+import User from "../models/user_model.js";
 
-const userAuthMiddleware = async (req, res, next) => {
-  const token = req.headers.token;
-  if (!token) {
-    res.send("Please Provide Token");
-  } else {
+export const userAuthMiddleware = async (req, res, next) => {
     try {
-      const user = await jwt.verify(token, process.env.JWT_SECRET);
-      console.log(user);
-      req.body.user = user.user; //This line is taking the user information from the decoded token and attaching it to the request body.
-      next();
-    } catch (err) {
-      res.send(err);
-    }
-  }
-};
+        // Check if Authorization header exists
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({
+                success: false,
+                message: "Please provide a valid token"
+            });
+        }
 
-export { userAuthMiddleware };
+        // Get token from header
+        const token = authHeader.split(' ')[1];
+        if (!token) {
+            return res.status(401).json({
+                success: false,
+                message: "Please provide a token"
+            });
+        }
+
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        
+        // Get user from database
+        const user = await User.findById(decoded.userId);
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        // Add user to request object
+        req.user = user;
+        req.token = token;
+        next();
+
+    } catch (error) {
+        return res.status(401).json({
+            success: false,
+            message: "Invalid token"
+        });
+    }
+};
